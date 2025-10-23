@@ -22,7 +22,7 @@ jobs:
 
       - name: Upload Glue script to S3
         run: |
-          aws s3 cp glue_job.py s3://aws-glue-assets-816069169041-eu-west-2/scripts/
+          aws s3 cp loan_payment.ipynb s3://aws-glue-assets-816069169041-eu-west-2/scripts/
 
       - name: Update Glue job
         run: |
