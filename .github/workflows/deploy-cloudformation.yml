@@ -25,7 +25,7 @@ jobs:
         run: |
           aws cloudformation deploy \
             --stack-name my-stack-name \
-            --template-file infra/template.yaml \
+            --template-file infra/s3-glue-datalake.yaml \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --parameter-overrides \
               Environment=prod \
