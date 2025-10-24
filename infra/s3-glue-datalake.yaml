@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: S3 Datalake Bucket with folders (data, code) and IAM Role for AWS Glue access
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: "loan-analysis-app-datalake-eu-west2"
+    Description: Name of the S3 data lake bucket
+
+Resources:
+
+  # -------------------------
+  # S3 Data Lake Bucket
+  # -------------------------
+  DataLakeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+
+  # -------------------------
+  # S3 Folder Placeholders (to create 'data/' and 'code/' folders)
+  # -------------------------
+  DataFolder:
+    Type: AWS::S3::Object
+    Properties:
+      Bucket: !Ref DataLakeBucket
+      Key: "data/"
+      ContentLength: 0
+
+  CodeFolder:
+    Type: AWS::S3::Object
+    Properties:
+      Bucket: !Ref DataLakeBucket
+      Key: "code/"
+      ContentLength: 0
+
+  # -------------------------
+  # IAM Role for Glue
+  # -------------------------
+  GlueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "GlueDatalakeRole"
+      DeletionPolicy: Retain
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+
+  # -------------------------
+  # S3 Access Policy for Glue Role
+  # -------------------------
+  GlueS3AccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: "GlueDatalakeS3Access"
+      Roles:
+        - !Ref GlueRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:aws:s3:::${BucketName}
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource:
+              - !Sub arn:aws:s3:::${BucketName}/*
+
+Outputs:
+  DataLakeBucketName:
+    Description: The name of the S3 bucket created
+    Value: !Ref DataLakeBucket
+
+  GlueRoleArn:
+    Description: IAM Role ARN for Glue access
+    Value: !GetAtt GlueRole.Arn
