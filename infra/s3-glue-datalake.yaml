@@ -4,7 +4,7 @@ Description: S3 Datalake Bucket and IAM Role for AWS Glue access
 Parameters:
   BucketName:
     Type: String
-    Default: "loan-analysis-app-datalake-eu-west2"
+    Default: "loan-analysis-git-app-datalake-eu-west2"
     Description: Name of the S3 data lake bucket
 
   CreateS3Bucket:
