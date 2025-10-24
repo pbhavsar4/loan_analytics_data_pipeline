@@ -42,7 +42,7 @@ Resources:
     Condition: CreateGlueRoleCondition
     DeletionPolicy: Retain
     Properties:
-      RoleName: "GlueDatalakeRole"
+      RoleName: "GlueDatalakeRole-git"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
