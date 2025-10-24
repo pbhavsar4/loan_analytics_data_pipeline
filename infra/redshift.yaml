@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Redshift Serverless Setup with Secrets Manager for password
+Description: Simple Redshift Serverless Namespace and Workgroup using default VPC
 
 Parameters:
   RedshiftNamespaceName:
@@ -17,29 +17,24 @@ Parameters:
     Default: my-redshift-workgroup
     Description: Name of the Redshift Serverless workgroup
 
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: VPC ID for the Redshift Serverless workgroup (optional)
-
-  SubnetIds:
-    Type: List<AWS::EC2::Subnet::Id>
-    Description: Subnet IDs for the Redshift Serverless workgroup
-
 Resources:
 
   # -------------------------
-  # Secret in Secrets Manager
+  # IAM Role for Redshift S3 access
   # -------------------------
-  RedshiftAdminSecret:
-    Type: AWS::SecretsManager::Secret
+  RedshiftS3Role:
+    Type: AWS::IAM::Role
     Properties:
-      Name: !Sub "${AWS::StackName}-RedshiftAdminSecret"
-      Description: Redshift Serverless admin user password
-      GenerateSecretString:
-        SecretStringTemplate: '{"username":"adminuser"}'
-        GenerateStringKey: "password"
-        PasswordLength: 16
-        ExcludeCharacters: '"@/\'
+      RoleName: !Sub "${AWS::StackName}-RedshiftS3Role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: redshift-serverless.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 
   # -------------------------
   # Redshift Serverless Namespace
@@ -49,24 +44,27 @@ Resources:
     Properties:
       NamespaceName: !Ref RedshiftNamespaceName
       DbName: !Ref RedshiftDBName
-      AdminUsername: !Join ['', [{{resolve:secretsmanager:]], !Ref RedshiftAdminSecret, !Join ['', [":username}}"]]] # uses secret username
-      AdminUserPassword: !Join ['', [{{resolve:secretsmanager:]], !Ref RedshiftAdminSecret, !Join ['', [":password}}"]]] # uses secret password
-      DefaultIamRoleArn: arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+      AdminUsername: adminuser
+      AdminUserPassword: !Sub "${AWS::StackName}-RedshiftPassword123"
+      DefaultIamRoleArn: !GetAtt RedshiftS3Role.Arn
+      IamRoles:
+        - !GetAtt RedshiftS3Role.Arn
       Tags:
         - Key: Environment
           Value: Production
+
 
   # -------------------------
   # Redshift Serverless Workgroup
   # -------------------------
   RedshiftWorkgroup:
     Type: AWS::RedshiftServerless::Workgroup
+    DependsOn: RedshiftNamespace
     Properties:
       WorkgroupName: !Ref RedshiftWorkgroupName
       NamespaceName: !Ref RedshiftNamespaceName
-      BaseCapacity: 16  # Compute capacity in Redshift Processing Units (RPUs)
-      PubliclyAccessible: false
-      SubnetIds: !Ref SubnetIds
+      BaseCapacity: 16
+      PubliclyAccessible: true  # default VPC allows public access
       Tags:
         - Key: Environment
           Value: Production
@@ -80,6 +78,6 @@ Outputs:
     Description: Redshift Serverless workgroup
     Value: !Ref RedshiftWorkgroup
 
-  RedshiftAdminSecretArn:
-    Description: ARN of the admin credentials secret
-    Value: !Ref RedshiftAdminSecret
+  RedshiftS3RoleArn:
+    Description: ARN of the IAM role used by Redshift
+    Value: !GetAtt RedshiftS3Role.Arn
