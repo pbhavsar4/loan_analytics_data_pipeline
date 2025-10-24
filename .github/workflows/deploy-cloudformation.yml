@@ -20,12 +20,32 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Deploy CloudFormation Template
+          
+      - name: Deploy CloudFormation Template s3
         run: |
           aws cloudformation deploy \
             --stack-name my-stack-name \
             --template-file infra/redshift.yaml \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              Environment=prod \
+              AppName=myapp
+
+      - name: Deploy CloudFormation Template redshift
+        run: |
+          aws cloudformation deploy \
+            --stack-name my-stack-name \
+            --template-file infra/redshift.yaml \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              Environment=prod \
+              AppName=myapp
+
+      - name: Deploy CloudFormation Template glue
+        run: |
+          aws cloudformation deploy \
+            --stack-name my-stack-name \
+            --template-file infra/infra/infra/glue-template.yaml \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --parameter-overrides \
               Environment=prod \
