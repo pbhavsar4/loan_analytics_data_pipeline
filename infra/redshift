@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Redshift Serverless Setup with Secrets Manager for password
+
+Parameters:
+  RedshiftNamespaceName:
+    Type: String
+    Default: my-redshift-namespace
+    Description: Name of the Redshift Serverless namespace
+
+  RedshiftDBName:
+    Type: String
+    Default: analyticsdb
+    Description: Default database name
+
+  RedshiftWorkgroupName:
+    Type: String
+    Default: my-redshift-workgroup
+    Description: Name of the Redshift Serverless workgroup
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID for the Redshift Serverless workgroup (optional)
+
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Subnet IDs for the Redshift Serverless workgroup
+
+Resources:
+
+  # -------------------------
+  # Secret in Secrets Manager
+  # -------------------------
+  RedshiftAdminSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${AWS::StackName}-RedshiftAdminSecret"
+      Description: Redshift Serverless admin user password
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"adminuser"}'
+        GenerateStringKey: "password"
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+
+  # -------------------------
+  # Redshift Serverless Namespace
+  # -------------------------
+  RedshiftNamespace:
+    Type: AWS::RedshiftServerless::Namespace
+    Properties:
+      NamespaceName: !Ref RedshiftNamespaceName
+      DbName: !Ref RedshiftDBName
+      AdminUsername: !Join ['', [{{resolve:secretsmanager:]], !Ref RedshiftAdminSecret, !Join ['', [":username}}"]]] # uses secret username
+      AdminUserPassword: !Join ['', [{{resolve:secretsmanager:]], !Ref RedshiftAdminSecret, !Join ['', [":password}}"]]] # uses secret password
+      DefaultIamRoleArn: arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+      Tags:
+        - Key: Environment
+          Value: Production
+
+  # -------------------------
+  # Redshift Serverless Workgroup
+  # -------------------------
+  RedshiftWorkgroup:
+    Type: AWS::RedshiftServerless::Workgroup
+    Properties:
+      WorkgroupName: !Ref RedshiftWorkgroupName
+      NamespaceName: !Ref RedshiftNamespaceName
+      BaseCapacity: 16  # Compute capacity in Redshift Processing Units (RPUs)
+      PubliclyAccessible: false
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - Key: Environment
+          Value: Production
+
+Outputs:
+  RedshiftNamespaceName:
+    Description: Redshift Serverless namespace
+    Value: !Ref RedshiftNamespace
+
+  RedshiftWorkgroupName:
+    Description: Redshift Serverless workgroup
+    Value: !Ref RedshiftWorkgroup
+
+  RedshiftAdminSecretArn:
+    Description: ARN of the admin credentials secret
+    Value: !Ref RedshiftAdminSecret
