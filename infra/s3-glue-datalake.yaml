@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: S3 Datalake Bucket with folders (data, code) and IAM Role for AWS Glue access
+Description: S3 Datalake Bucket and IAM Role for AWS Glue access
 
 Parameters:
   BucketName:
@@ -7,41 +7,42 @@ Parameters:
     Default: "loan-analysis-app-datalake-eu-west2"
     Description: Name of the S3 data lake bucket
 
+  CreateS3Bucket:
+    Type: String
+    Default: "Yes"
+    AllowedValues: ["Yes", "No"]
+    Description: Whether to create the S3 data lake bucket
+
+  CreateGlueRole:
+    Type: String
+    Default: "Yes"
+    AllowedValues: ["Yes", "No"]
+    Description: Whether to create the IAM role for Glue
+
+Conditions:
+  CreateBucketCondition: !Equals [!Ref CreateS3Bucket, "Yes"]
+  CreateGlueRoleCondition: !Equals [!Ref CreateGlueRole, "Yes"]
+
 Resources:
 
   # -------------------------
-  # S3 Data Lake Bucket
+  # S3 Data Lake Bucket (Optional)
   # -------------------------
   DataLakeBucket:
     Type: AWS::S3::Bucket
+    Condition: CreateBucketCondition
     Properties:
       BucketName: !Ref BucketName
 
   # -------------------------
-  # S3 Folder Placeholders (to create 'data/' and 'code/' folders)
-  # -------------------------
-  DataFolder:
-    Type: AWS::S3::Object
-    Properties:
-      Bucket: !Ref DataLakeBucket
-      Key: "data/"
-      ContentLength: 0
-
-  CodeFolder:
-    Type: AWS::S3::Object
-    Properties:
-      Bucket: !Ref DataLakeBucket
-      Key: "code/"
-      ContentLength: 0
-
-  # -------------------------
-  # IAM Role for Glue
+  # IAM Role for Glue (Optional)
   # -------------------------
   GlueRole:
     Type: AWS::IAM::Role
+    Condition: CreateGlueRoleCondition
+    DeletionPolicy: Retain
     Properties:
       RoleName: "GlueDatalakeRole"
-      DeletionPolicy: Retain
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -59,6 +60,7 @@ Resources:
   # -------------------------
   GlueS3AccessPolicy:
     Type: AWS::IAM::Policy
+    Condition: CreateGlueRoleCondition
     Properties:
       PolicyName: "GlueDatalakeS3Access"
       Roles:
@@ -81,9 +83,11 @@ Resources:
 
 Outputs:
   DataLakeBucketName:
+    Condition: CreateBucketCondition
     Description: The name of the S3 bucket created
     Value: !Ref DataLakeBucket
 
   GlueRoleArn:
+    Condition: CreateGlueRoleCondition
     Description: IAM Role ARN for Glue access
     Value: !GetAtt GlueRole.Arn
