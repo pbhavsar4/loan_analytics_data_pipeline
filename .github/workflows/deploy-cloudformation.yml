@@ -15,7 +15,7 @@ jobs:
     env:
       AWS_REGION: eu-west-2
       LAMBDA_STACK_NAME: loan-etl-lambda
-      LOCAL_LAMBDA_CODE_PATH: pipeline/  # your Lambda folder path
+      LOCAL_LAMBDA_CODE_PATH: pipeline/  # your lambda folder path
       DATA_LAKE_BUCKET: loan-analysis-datalake-main  # fixed bucket name
 
     steps:
@@ -54,12 +54,16 @@ jobs:
           BUCKET=${{ steps.ensure_bucket.outputs.bucket }}
 
           # Zip Bronze Lambda
-          zip -r lambda_transform_bronze_to_silver.zip ${{ env.LOCAL_LAMBDA_CODE_PATH }}/bronze/
+          cd ${{ env.LOCAL_LAMBDA_CODE_PATH }}
+          zip -r ../lambda_transform_bronze_to_silver.zip pipelne/lambda_transform_bronze_to_silver/*
+          cd ..
           aws s3 cp lambda_transform_bronze_to_silver.zip s3://$BUCKET/code/
           echo "✅ Uploaded Bronze Lambda code to s3://$BUCKET/code/"
 
           # Zip Silver Lambda
-          zip -r lambda_transform_silver_to_gold.zip ${{ env.LOCAL_LAMBDA_CODE_PATH }}/silver/
+          cd ${{ env.LOCAL_LAMBDA_CODE_PATH }}
+          zip -r ../lambda_transform_silver_to_gold.zip pipeline/lambda_transform_silver_to_gold/*
+          cd ..
           aws s3 cp lambda_transform_silver_to_gold.zip s3://$BUCKET/code/
           echo "✅ Uploaded Silver Lambda code to s3://$BUCKET/code/"
 
@@ -80,7 +84,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides DataLakeBucketName=${{ steps.ensure_bucket.outputs.bucket }}
 
-      # 7️⃣ Verification step
+      # 7️⃣ Verification step (optional)
       - name: List Lambda functions
         run: |
           aws lambda list-functions --region $AWS_REGION
