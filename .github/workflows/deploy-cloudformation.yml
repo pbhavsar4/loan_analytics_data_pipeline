@@ -2,9 +2,8 @@ name: Deploy ETL Pipeline
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    paths:
+      - 'cloudformation/**'
 
 jobs:
   deploy:

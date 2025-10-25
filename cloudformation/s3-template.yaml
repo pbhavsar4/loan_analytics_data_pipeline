@@ -1,23 +1,15 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: S3 Data Lake Bucket 
-
-Parameters:
-  BucketName:
-    Type: String
-    Default: "loan-analysis-app-datalake-eu-west2"
-    Description: Name of the S3 data lake bucket
+Description: "S3 bucket for ETL pipeline with event triggers"
 
 Resources:
-
-  # -------------------------
-  # S3 Data Lake Bucket
-  # -------------------------
   DataLakeBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref BucketName
+      BucketName: !Sub "loan-analysis-datalake-${AWS::Region}"
 
 Outputs:
   DataLakeBucketName:
-    Description: The name of the S3 bucket created
+    Description: "Data Lake Bucket Name"
     Value: !Ref DataLakeBucket
+    Export:
+      Name: DataLakeBucketName
