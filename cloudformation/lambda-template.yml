@@ -41,12 +41,12 @@ Resources:
     Properties:
       FunctionName: "bronze-transform-lambda"
       Handler: index.handler
-      Runtime: python3.9
-      Timeout: 60
+      Runtime: python3.9                                                                                                 
+      Timeout: 120
       Role: !GetAtt LoanETLRole.Arn
       Code:
         S3Bucket: !Ref DataLakeBucketName
-        S3Key: pipeline/bronze.zip
+        S3Key: pipeline/lambda_transform_bronze_to_silver.zip
       Environment:
         Variables:
           BUCKET_NAME: !Ref DataLakeBucketName
@@ -60,11 +60,11 @@ Resources:
       FunctionName: "silver-transform-lambda"
       Handler: index.handler
       Runtime: python3.9
-      Timeout: 60
+      Timeout: 120
       Role: !GetAtt LoanETLRole.Arn
       Code:
         S3Bucket: !Ref DataLakeBucketName
-        S3Key: pipeline/silver.zip
+        S3Key: pipeline/lambda_transform_bronze_to_silver.zip
       Environment:
         Variables:
           BUCKET_NAME: !Ref DataLakeBucketName
