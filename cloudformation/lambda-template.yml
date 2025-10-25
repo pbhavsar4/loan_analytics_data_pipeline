@@ -22,10 +22,11 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: S3AccessPolicy
+        - PolicyName: S3AndGlueAccessPolicy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
+              # S3 permissions
               - Effect: Allow
                 Action:
                   - s3:GetObject
@@ -34,6 +35,19 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::${DataLakeBucketName}
                   - !Sub arn:aws:s3:::${DataLakeBucketName}/*
+              # Glue permissions
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetTable
+                  - glue:CreateTable
+                  - glue:UpdateTable
+                  - glue:DeleteTable
+                  - glue:GetPartitions
+                  - glue:CreatePartition
+                  - glue:UpdatePartition
+                  - glue:DeletePartition
+                Resource: "*"
 
   # ---- Bronze Lambda ----
   BronzeLambdaFunction:

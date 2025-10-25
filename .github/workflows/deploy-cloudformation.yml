@@ -15,7 +15,7 @@ jobs:
     env:
       AWS_REGION: eu-west-2
       LAMBDA_STACK_NAME: loan-etl-lambda
-      LOCAL_LAMBDA_CODE_PATH: pipeline/  # your lambda folder path
+      LOCAL_LAMBDA_CODE_PATH: pipeline/  # your Lambda folder path
       DATA_LAKE_BUCKET: loan-analysis-datalake-main  # fixed bucket name
 
     steps:
@@ -48,11 +48,20 @@ jobs:
           fi
           echo "bucket=$BUCKET_NAME" >> $GITHUB_OUTPUT
 
-      # 4️⃣ Upload Lambda code to /code folder in the S3 bucket
-      - name: Upload Lambda code to S3
+      # 4️⃣ Zip and upload Lambda code to /code folder in the S3 bucket
+      - name: Zip and upload Lambda code to S3
         run: |
-          aws s3 cp $LOCAL_LAMBDA_CODE_PATH s3://${{ steps.ensure_bucket.outputs.bucket }}/code/ --recursive
-          echo "✅ Uploaded Lambda code to s3://${{ steps.ensure_bucket.outputs.bucket }}/code/"
+          BUCKET=${{ steps.ensure_bucket.outputs.bucket }}
+
+          # Zip Bronze Lambda
+          zip -r lambda_transform_bronze_to_silver.zip ${{ env.LOCAL_LAMBDA_CODE_PATH }}/bronze/
+          aws s3 cp lambda_transform_bronze_to_silver.zip s3://$BUCKET/code/
+          echo "✅ Uploaded Bronze Lambda code to s3://$BUCKET/code/"
+
+          # Zip Silver Lambda
+          zip -r lambda_transform_silver_to_gold.zip ${{ env.LOCAL_LAMBDA_CODE_PATH }}/silver/
+          aws s3 cp lambda_transform_silver_to_gold.zip s3://$BUCKET/code/
+          echo "✅ Uploaded Silver Lambda code to s3://$BUCKET/code/"
 
       # 5️⃣ Package the Lambda CloudFormation template
       - name: Package Lambda CloudFormation template
@@ -71,7 +80,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides DataLakeBucketName=${{ steps.ensure_bucket.outputs.bucket }}
 
-      # 7️⃣ Verification step (optional)
+      # 7️⃣ Verification step
       - name: List Lambda functions
         run: |
           aws lambda list-functions --region $AWS_REGION
