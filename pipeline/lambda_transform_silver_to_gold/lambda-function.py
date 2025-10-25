@@ -30,8 +30,8 @@ def write_parquet_to_s3(df, bucket, key):
 
 def lambda_handler(event, context):
     # --- Read Silver layer tables ---
-    fact_df = read_parquet_from_s3(BUCKET_NAME, f"{SILVER_PREFIX}fact_loan_payment/data.parquet")
-    customer_df = read_parquet_from_s3(BUCKET_NAME, f"{SILVER_PREFIX}dim_customer/data.parquet")
+    fact_df = read_parquet_from_s3(BUCKET_NAME, f"{SILVER_PREFIX}fact_loan_payment/")
+    customer_df = read_parquet_from_s3(BUCKET_NAME, f"{SILVER_PREFIX}dim_customer/")
 
     # --- Join to include Region info ---
     merged_df = pd.merge(fact_df, customer_df, on="Customer_ID", how="left")
