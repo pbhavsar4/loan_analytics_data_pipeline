@@ -1,52 +1,50 @@
-name: Deploy CloudFormation Stack
+name: Deploy ETL Pipeline
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    env:
+      AWS_REGION: eu-west-2
+      STACK_NAME: loan-etl-stack
+      S3_BUCKET: banking-collection-app-datalake-eu-west2
+
     steps:
-      - name: Checkout Code
+      # 1️⃣ Checkout the repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 2️⃣ Configure AWS credentials
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-          
-      - name: Deploy CloudFormation Template s3
-        run: |
-          aws cloudformation deploy \
-            --stack-name my-stack-name \
-            --template-file infra/redshift.yaml \
-            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-            --parameter-overrides \
-              Environment=prod \
-              AppName=myapp
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy CloudFormation Template redshift
+      # 3️⃣ Package the SAM/CloudFormation template
+      - name: Package CloudFormation/SAM template
         run: |
-          aws cloudformation deploy \
-            --stack-name my-stack-name \
-            --template-file infra/redshift.yaml \
-            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-            --parameter-overrides \
-              Environment=prod \
-              AppName=myapp
+          aws cloudformation package \
+            --template-file cloudformation/template.yml \
+            --s3-bucket $S3_BUCKET \
+            --output-template-file cloudformation/packaged-template.yml
 
-      - name: Deploy CloudFormation Template glue
+      # 4️⃣ Deploy the stack
+      - name: Deploy CloudFormation stack
         run: |
           aws cloudformation deploy \
-            --stack-name my-stack-name \
-            --template-file infra/infra/infra/glue-template.yaml \
-            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-            --parameter-overrides \
-              Environment=prod \
-              AppName=myapp
+            --template-file cloudformation/packaged-template.yml \
+            --stack-name $STACK_NAME \
+            --capabilities CAPABILITY_NAMED_IAM
+
+      # 5️⃣ Optional: Verify Lambda deployed
+      - name: List Lambda functions
+        run: |
+          aws lambda list-functions --region $AWS_REGION
