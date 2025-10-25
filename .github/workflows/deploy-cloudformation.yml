@@ -2,8 +2,9 @@ name: Deploy ETL Pipeline
 
 on:
   push:
-    paths:
-      - 'cloudformation/**'
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -11,12 +12,12 @@ jobs:
 
     env:
       AWS_REGION: eu-west-2
-      S3_STACK_NAME: loan-s3-stack
-      LAMBDA_STACK_NAME: loan-lambda-stack
-      S3_BUCKET: loan-analysis-datalake-eu-west2
+      S3_STACK_NAME: loan-etl-s3
+      LAMBDA_STACK_NAME: loan-etl-lambda
+      LOCAL_LAMBDA_CODE_PATH: datapipeline/lambda  # your lambda folder path
 
     steps:
-      # 1️⃣ Checkout repository
+      # 1️⃣ Checkout the repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -28,34 +29,41 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3️⃣ Deploy the S3 stack first
-      - name: Deploy S3 CloudFormation stack
+      # 3️⃣ Get the S3 bucket name from CloudFormation outputs
+      - name: Get S3 bucket name
+        id: get_bucket
         run: |
-          aws cloudformation deploy \
-            --template-file cloudformation/s3-template.yaml \
+          BUCKET=$(aws cloudformation describe-stacks \
             --stack-name $S3_STACK_NAME \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region $AWS_REGION
+            --query "Stacks[0].Outputs[?OutputKey=='DataLakeBucketName'].OutputValue" \
+            --output text)
+          echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
+          echo "Using S3 Bucket: $BUCKET"
 
-      # 4️⃣ Package and deploy the Lambda stack
-      - name: Package and deploy Lambda stack
+      # 4️⃣ Upload Lambda code to /code folder in the S3 bucket
+      - name: Upload Lambda code to S3
+        run: |
+          aws s3 cp $LOCAL_LAMBDA_CODE_PATH s3://${{ steps.get_bucket.outputs.bucket }}/code/ --recursive
+          echo "✅ Uploaded Lambda code to s3://${{ steps.get_bucket.outputs.bucket }}/code/"
+
+      # 5️⃣ Package the Lambda CloudFormation template
+      - name: Package Lambda CloudFormation template
         run: |
           aws cloudformation package \
-            --template-file cloudformation/lambda-template.yaml \
-            --s3-bucket $S3_BUCKET \
-            --output-template-file cloudformation/packaged-lambda.yaml
+            --template-file cloudformation/lambda-template.yml \
+            --s3-bucket ${{ steps.get_bucket.outputs.bucket }} \
+            --output-template-file cloudformation/packaged-template.yml
 
+      # 6️⃣ Deploy the Lambda stack
+      - name: Deploy Lambda CloudFormation stack
+        run: |
           aws cloudformation deploy \
-            --template-file cloudformation/packaged-lambda.yaml \
+            --template-file cloudformation/packaged-template.yml \
             --stack-name $LAMBDA_STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
-            --region $AWS_REGION
+            --parameter-overrides DataLakeBucketName=${{ steps.get_bucket.outputs.bucket }}
 
-      # 5️⃣ Verify Lambda and stack deployment
-      - name: Verify deployment
+      # 7️⃣ Verification step (optional)
+      - name: List Lambda functions
         run: |
-          echo "Listing Lambda functions:"
           aws lambda list-functions --region $AWS_REGION
-
-          echo "Listing CloudFormation stacks:"
-          aws cloudformation list-stacks --region $AWS_REGION
