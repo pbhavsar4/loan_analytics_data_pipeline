@@ -39,7 +39,7 @@ Resources:
   BronzeLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: "bronze-transform-lambda"
+      FunctionName: "lambda-function"
       Handler: index.handler
       Runtime: python3.9                                                                                                 
       Timeout: 120
@@ -57,7 +57,7 @@ Resources:
   SilverLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: "silver-transform-lambda"
+      FunctionName: "lambda-function"
       Handler: index.handler
       Runtime: python3.9
       Timeout: 120
