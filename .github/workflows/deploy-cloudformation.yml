@@ -13,7 +13,7 @@ jobs:
     env:
       AWS_REGION: eu-west-2
       LAMBDA_STACK_NAME: loan-etl-lambda
-      LOCAL_LAMBDA_CODE_PATH: datapipeline/lambda  # your lambda folder path
+      LOCAL_LAMBDA_CODE_PATH: pipeline/  # your lambda folder path
 
     steps:
       # 1️⃣ Checkout the repo
@@ -43,7 +43,7 @@ jobs:
       # 4️⃣ Upload Lambda code to /code folder in the S3 bucket
       - name: Upload Lambda code to S3
         run: |
-          aws s3 cp $LOCAL_LAMBDA_CODE_PATH s3://${{ steps.create_bucket.outputs.bucket }}/pipeline/ --recursive
+          aws s3 cp $LOCAL_LAMBDA_CODE_PATH s3://${{ steps.create_bucket.outputs.bucket }}/code/ --recursive
           echo "✅ Uploaded Lambda code to s3://${{ steps.create_bucket.outputs.bucket }}/code/"
 
       # 5️⃣ Package the Lambda CloudFormation template
