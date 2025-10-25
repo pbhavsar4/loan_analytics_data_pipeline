@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "cloudformation/**" 
   workflow_dispatch:
 
 jobs:
