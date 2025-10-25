@@ -29,5 +29,5 @@ jobs:
 
       - name: Copy files from input/ to S3
         run: |
-          aws s3 cp input/ s3://${{ env.DATA_LAKE_BUCKET }}/bronze/ --recursive
+          aws s3 cp input/ s3://${{ env.DATA_LAKE_BUCKET }}/data/bronze/ --recursive
           echo "✅ Uploaded files to s3://${{ env.DATA_LAKE_BUCKET }}/bronze/"
