@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "cloudformation/**" 
+      - "cloudformation/**"   # run only if CloudFormation files change
   workflow_dispatch:
 
 jobs:
@@ -31,30 +31,47 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3️⃣ Upload Lambda code to /code folder in the S3 bucket
+      # 3️⃣ Ensure S3 bucket exists
+      - name: Ensure S3 bucket exists
+        id: ensure_bucket
+        run: |
+          BUCKET_NAME=${{ env.DATA_LAKE_BUCKET }}
+          if aws s3api head-bucket --bucket $BUCKET_NAME 2>/dev/null; then
+            echo "Bucket $BUCKET_NAME already exists."
+          else
+            echo "Bucket $BUCKET_NAME does not exist. Creating..."
+            aws s3api create-bucket \
+              --bucket $BUCKET_NAME \
+              --region $AWS_REGION \
+              --create-bucket-configuration LocationConstraint=$AWS_REGION
+            echo "Bucket $BUCKET_NAME created."
+          fi
+          echo "bucket=$BUCKET_NAME" >> $GITHUB_OUTPUT
+
+      # 4️⃣ Upload Lambda code to /code folder in the S3 bucket
       - name: Upload Lambda code to S3
         run: |
-          aws s3 cp $LOCAL_LAMBDA_CODE_PATH s3://${{ env.DATA_LAKE_BUCKET }}/code/ --recursive
-          echo "✅ Uploaded Lambda code to s3://${{ env.DATA_LAKE_BUCKET }}/code/"
+          aws s3 cp $LOCAL_LAMBDA_CODE_PATH s3://${{ steps.ensure_bucket.outputs.bucket }}/code/ --recursive
+          echo "✅ Uploaded Lambda code to s3://${{ steps.ensure_bucket.outputs.bucket }}/code/"
 
-      # 4️⃣ Package the Lambda CloudFormation template
+      # 5️⃣ Package the Lambda CloudFormation template
       - name: Package Lambda CloudFormation template
         run: |
           aws cloudformation package \
             --template-file cloudformation/lambda-template.yml \
-            --s3-bucket ${{ env.DATA_LAKE_BUCKET }} \
+            --s3-bucket ${{ steps.ensure_bucket.outputs.bucket }} \
             --output-template-file cloudformation/packaged-template.yml
 
-      # 5️⃣ Deploy the Lambda stack
+      # 6️⃣ Deploy the Lambda stack
       - name: Deploy Lambda CloudFormation stack
         run: |
           aws cloudformation deploy \
             --template-file cloudformation/packaged-template.yml \
             --stack-name $LAMBDA_STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
-            --parameter-overrides DataLakeBucketName=${{ env.DATA_LAKE_BUCKET }}
+            --parameter-overrides DataLakeBucketName=${{ steps.ensure_bucket.outputs.bucket }}
 
-      # 6️⃣ Verification step (optional)
+      # 7️⃣ Verification step (optional)
       - name: List Lambda functions
         run: |
           aws lambda list-functions --region $AWS_REGION
