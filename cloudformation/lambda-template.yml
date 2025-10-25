@@ -40,7 +40,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: "lambda_transform_bronze_to_silver"
-      Handler: lambda-function.handler
+      Handler: lambda-function.lambda_handler
       Runtime: python3.9
       Timeout: 120
       Role: !GetAtt LoanETLRole.Arn
@@ -60,7 +60,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: "lambda_transform_silver_to_gold"
-      Handler: lambda-function.handler
+      Handler: lambda-function.lambda_handler
       Runtime: python3.9
       Timeout: 120
       Role: !GetAtt LoanETLRole.Arn
