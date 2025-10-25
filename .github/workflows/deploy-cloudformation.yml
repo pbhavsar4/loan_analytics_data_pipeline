@@ -17,7 +17,7 @@ jobs:
       S3_BUCKET: loan-analysis-datalake-eu-west2
 
     steps:
-      # 1️⃣ Checkout the repo
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -33,7 +33,7 @@ jobs:
       - name: Deploy S3 CloudFormation stack
         run: |
           aws cloudformation deploy \
-            --template-file cloudformation/s3-template.yml \
+            --template-file cloudformation/s3-template.yaml \
             --stack-name $S3_STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
             --region $AWS_REGION
@@ -42,21 +42,21 @@ jobs:
       - name: Package and deploy Lambda stack
         run: |
           aws cloudformation package \
-            --template-file cloudformation/lambda-template.yml \
+            --template-file cloudformation/lambda-template.yaml \
             --s3-bucket $S3_BUCKET \
-            --output-template-file cloudformation/packaged-lambda.yml
+            --output-template-file cloudformation/packaged-lambda.yaml
 
           aws cloudformation deploy \
-            --template-file cloudformation/packaged-lambda.yml \
+            --template-file cloudformation/packaged-lambda.yaml \
             --stack-name $LAMBDA_STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
             --region $AWS_REGION
 
-      # 5️⃣ Optional - Verify deployed resources
+      # 5️⃣ Verify Lambda and stack deployment
       - name: Verify deployment
         run: |
           echo "Listing Lambda functions:"
           aws lambda list-functions --region $AWS_REGION
-          
-          echo "Listing deployed stacks:"
+
+          echo "Listing CloudFormation stacks:"
           aws cloudformation list-stacks --region $AWS_REGION
