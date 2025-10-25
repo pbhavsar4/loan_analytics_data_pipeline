@@ -11,6 +11,10 @@ jobs:
   upload-to-s3:
     runs-on: ubuntu-latest
 
+    env:
+      AWS_REGION: eu-west-2
+      DATA_LAKE_BUCKET: loan-analysis-datalake-main  # fixed bucket
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,8 +24,9 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-2  # change to your region
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Copy files from input/ to S3
         run: |
-          aws s3 cp input/ s3://loan-analysis-datalake-18807245092-27476/bronze/ --recursive
+          aws s3 cp input/ s3://${{ env.DATA_LAKE_BUCKET }}/bronze/ --recursive
+          echo "✅ Uploaded files to s3://${{ env.DATA_LAKE_BUCKET }}/bronze/"

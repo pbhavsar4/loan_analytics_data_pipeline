@@ -50,8 +50,8 @@ Resources:
       Environment:
         Variables:
           BUCKET_NAME: !Ref DataLakeBucketName
-          INPUT_PREFIX: data/bronze/
-          OUTPUT_PREFIX: data/silver/
+          BRONZE_PREFIX: data/bronze/
+          SILVER_PREFIX: data/silver/
       Layers:
         - arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python39:31
 
@@ -70,8 +70,8 @@ Resources:
       Environment:
         Variables:
           BUCKET_NAME: !Ref DataLakeBucketName
-          INPUT_PREFIX: data/silver/
-          OUTPUT_PREFIX: data/gold/
+          SILVER_PREFIX: data/silver/
+          GOLD_PREFIX: data/gold/
       Layers:
         - arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python39:31
 
