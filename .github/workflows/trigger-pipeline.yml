@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "input/**"
+  workflow_dispatch:
 
 jobs:
   upload-to-s3:
