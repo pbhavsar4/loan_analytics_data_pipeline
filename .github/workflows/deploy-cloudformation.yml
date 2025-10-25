@@ -5,7 +5,8 @@ on:
     branches:
       - main
     paths:
-      - "cloudformation/**"   # run only if CloudFormation files change
+      - "cloudformation/**"
+      - "pipeline/**"
   workflow_dispatch:
 
 jobs:

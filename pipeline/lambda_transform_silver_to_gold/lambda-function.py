@@ -14,12 +14,27 @@ SILVER_PREFIX = os.environ.get("SILVER_PREFIX", "Silver/")
 GOLD_PREFIX = os.environ.get("GOLD_PREFIX", "Gold/")
 ATHENA_DATABASE = os.environ.get("ATHENA_DATABASE", "loan_analytics")
 
-def read_parquet_from_s3(bucket, key):
-    """Read Parquet from S3 and return a Pandas DataFrame."""
-    obj = s3.get_object(Bucket=bucket, Key=key)
-    buffer = BytesIO(obj["Body"].read())
-    table = pq.read_table(buffer)
-    return table.to_pandas()
+
+def read_parquet_folder_from_s3(bucket, folder_key):
+    """Read all Parquet files in a folder and return a Pandas DataFrame."""
+    paginator = s3.get_paginator("list_objects_v2")
+    pages = paginator.paginate(Bucket=bucket, Prefix=folder_key)
+
+    dfs = []
+    for page in pages:
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+            if key.endswith(".parquet"):
+                response = s3.get_object(Bucket=bucket, Key=key)
+                buffer = BytesIO(response["Body"].read())
+                table = pq.read_table(buffer)
+                dfs.append(table.to_pandas())
+
+    if dfs:
+        return pd.concat(dfs, ignore_index=True)
+    else:
+        raise FileNotFoundError(f"No Parquet files found in s3://{bucket}/{folder_key}")
+
 
 def write_parquet_to_s3(df, bucket, key):
     """Write a Pandas DataFrame to Parquet in S3."""
@@ -28,10 +43,11 @@ def write_parquet_to_s3(df, bucket, key):
     pq.write_table(table, buffer)
     s3.put_object(Bucket=bucket, Key=key, Body=buffer.getvalue())
 
+
 def lambda_handler(event, context):
     # --- Read Silver layer tables ---
-    fact_df = read_parquet_from_s3(BUCKET_NAME, f"{SILVER_PREFIX}fact_loan_payment/")
-    customer_df = read_parquet_from_s3(BUCKET_NAME, f"{SILVER_PREFIX}dim_customer/")
+    fact_df = read_parquet_folder_from_s3(BUCKET_NAME, f"{SILVER_PREFIX}fact_loan_payment/")
+    customer_df = read_parquet_folder_from_s3(BUCKET_NAME, f"{SILVER_PREFIX}dim_customer/")
 
     # --- Join to include Region info ---
     merged_df = pd.merge(fact_df, customer_df, on="Customer_ID", how="left")
