@@ -7,7 +7,7 @@ Parameters:
     Description: "Name of the existing S3 data lake bucket"
 
 Resources:
-  # ---- IAM Role for Lambda ----
+  # ---- IAM Role for ETL Lambdas ----
   LoanETLRole:
     Type: AWS::IAM::Role
     Properties:
@@ -92,30 +92,56 @@ Resources:
       Principal: "s3.amazonaws.com"
       SourceArn: !Sub "arn:aws:s3:::${DataLakeBucketName}"
 
-  # ---- S3 Event Notifications ----
-  DataLakeBucketNotification:
-    Type: AWS::S3::BucketNotification
+  # ---- Custom Lambda to attach S3 triggers to existing bucket ----
+  S3TriggerSetterFunction:
+    Type: AWS::Lambda::Function
     Properties:
-      Bucket: !Ref DataLakeBucketName
-      NotificationConfiguration:
-        LambdaConfigurations:
-          - Event: "s3:ObjectCreated:*"
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: data/bronze/
-            Function: !GetAtt BronzeLambdaFunction.Arn
-          - Event: "s3:ObjectCreated:*"
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: data/silver/
-            Function: !GetAtt SilverLambdaFunction.Arn
-    DependsOn:
-      - BronzeInvokePermission
-      - SilverInvokePermission
+      FunctionName: "s3-trigger-setter"
+      Handler: index.handler
+      Runtime: python3.9
+      Timeout: 60
+      Role: !GetAtt LoanETLRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+
+          def handler(event, context):
+              try:
+                  s3 = boto3.client('s3')
+                  bucket = event['ResourceProperties']['BucketName']
+                  bronze_lambda = event['ResourceProperties']['BronzeLambdaArn']
+                  silver_lambda = event['ResourceProperties']['SilverLambdaArn']
+                  s3.put_bucket_notification_configuration(
+                      Bucket=bucket,
+                      NotificationConfiguration={
+                          'LambdaFunctionConfigurations': [
+                              {
+                                  'LambdaFunctionArn': bronze_lambda,
+                                  'Events': ['s3:ObjectCreated:*'],
+                                  'Filter': {'Key': {'FilterRules':[{'Name':'prefix','Value':'data/bronze/'}]}}
+                              },
+                              {
+                                  'LambdaFunctionArn': silver_lambda,
+                                  'Events': ['s3:ObjectCreated:*'],
+                                  'Filter': {'Key': {'FilterRules':[{'Name':'prefix','Value':'data/silver/'}]}}
+                              }
+                          ]
+                      }
+                  )
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              except Exception as e:
+                  print(e)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {})
+
+  # ---- Custom Resource to trigger S3 trigger Lambda ----
+  S3TriggerSetterResource:
+    Type: Custom::S3TriggerSetter
+    Properties:
+      ServiceToken: !GetAtt S3TriggerSetterFunction.Arn
+      BucketName: !Ref DataLakeBucketName
+      BronzeLambdaArn: !GetAtt BronzeLambdaFunction.Arn
+      SilverLambdaArn: !GetAtt SilverLambdaFunction.Arn
 
 Outputs:
   BronzeLambdaArn:
