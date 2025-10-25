@@ -12,8 +12,9 @@ jobs:
 
     env:
       AWS_REGION: eu-west-2
-      STACK_NAME: loan-etl-stack
-      S3_BUCKET: banking-collection-app-datalake-eu-west2
+      S3_STACK_NAME: loan-s3-stack
+      LAMBDA_STACK_NAME: loan-lambda-stack
+      S3_BUCKET: loan-analysis-datalake-eu-west2
 
     steps:
       # 1️⃣ Checkout the repo
@@ -28,23 +29,34 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3️⃣ Package the SAM/CloudFormation template
-      - name: Package CloudFormation/SAM template
-        run: |
-          aws cloudformation package \
-            --template-file cloudformation/template.yml \
-            --s3-bucket $S3_BUCKET \
-            --output-template-file cloudformation/packaged-template.yml
-
-      # 4️⃣ Deploy the stack
-      - name: Deploy CloudFormation stack
+      # 3️⃣ Deploy the S3 stack first
+      - name: Deploy S3 CloudFormation stack
         run: |
           aws cloudformation deploy \
-            --template-file cloudformation/packaged-template.yml \
-            --stack-name $STACK_NAME \
-            --capabilities CAPABILITY_NAMED_IAM
+            --template-file cloudformation/s3-template.yml \
+            --stack-name $S3_STACK_NAME \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region $AWS_REGION
 
-      # 5️⃣ Optional: Verify Lambda deployed
-      - name: List Lambda functions
+      # 4️⃣ Package and deploy the Lambda stack
+      - name: Package and deploy Lambda stack
         run: |
+          aws cloudformation package \
+            --template-file cloudformation/lambda-template.yml \
+            --s3-bucket $S3_BUCKET \
+            --output-template-file cloudformation/packaged-lambda.yml
+
+          aws cloudformation deploy \
+            --template-file cloudformation/packaged-lambda.yml \
+            --stack-name $LAMBDA_STACK_NAME \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region $AWS_REGION
+
+      # 5️⃣ Optional - Verify deployed resources
+      - name: Verify deployment
+        run: |
+          echo "Listing Lambda functions:"
           aws lambda list-functions --region $AWS_REGION
+          
+          echo "Listing deployed stacks:"
+          aws cloudformation list-stacks --region $AWS_REGION
