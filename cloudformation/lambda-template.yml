@@ -2,10 +2,10 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Lambda functions for ETL pipeline triggered by S3 uploads"
 
 Parameters:
+  # Bucket name is passed as a parameter (no Default)
   DataLakeBucketName:
     Type: String
     Description: "Name of the existing S3 data lake bucket"
-    Default: !ImportValue DataLakeBucketName
 
 Resources:
   # ---- Bronze Lambda ----
@@ -50,28 +50,6 @@ Resources:
       Action: "lambda:InvokeFunction"
       Principal: "s3.amazonaws.com"
       SourceArn: !Sub "arn:aws:s3:::${DataLakeBucketName}"
-
-  # ---- S3 Bucket Notification Configuration ----
-  S3BucketNotification:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Ref DataLakeBucketName
-      NotificationConfiguration:
-        LambdaConfigurations:
-          - Event: "s3:ObjectCreated:*"
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: "prefix"
-                    Value: "bronze/"
-            Function: !GetAtt BronzeLambdaFunction.Arn
-          - Event: "s3:ObjectCreated:*"
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: "prefix"
-                    Value: "silver/"
-            Function: !GetAtt SilverLambdaFunction.Arn
 
 Outputs:
   BronzeLambdaArn:
