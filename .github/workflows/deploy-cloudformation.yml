@@ -55,14 +55,14 @@ jobs:
 
           # Zip Bronze Lambda
           cd ${{ env.LOCAL_LAMBDA_CODE_PATH }}
-          zip -r ../lambda_transform_bronze_to_silver.zip lambda_transform_bronze_to_silver/*
+          zip -r ../lambda_transform_bronze_to_silver.zip lambda_transform_bronze_to_silver
           cd ..
           aws s3 cp lambda_transform_bronze_to_silver.zip s3://$BUCKET/code/
           echo "✅ Uploaded Bronze Lambda code to s3://$BUCKET/code/"
 
           # Zip Silver Lambda
           cd ${{ env.LOCAL_LAMBDA_CODE_PATH }}
-          zip -r ../lambda_transform_silver_to_gold.zip lambda_transform_silver_to_gold/*
+          zip -r ../lambda_transform_silver_to_gold.zip lambda_transform_silver_to_gold
           cd ..
           aws s3 cp lambda_transform_silver_to_gold.zip s3://$BUCKET/code/
           echo "✅ Uploaded Silver Lambda code to s3://$BUCKET/code/"
