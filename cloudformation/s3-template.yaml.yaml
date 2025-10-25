@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: S3 Data Lake Bucket 
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: "loan-analysis-app-datalake-eu-west2"
+    Description: Name of the S3 data lake bucket
+
+Resources:
+
+  # -------------------------
+  # S3 Data Lake Bucket
+  # -------------------------
+  DataLakeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+
+  # -------------------------
+  # Bucket Policy 
+  # -------------------------
+  DataLakeBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataLakeBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowListAndRead
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetObject
+            Resource:
+              - !Sub arn:aws:s3:::${BucketName}
+              - !Sub arn:aws:s3:::${BucketName}/*
+            Principal: "*"
+
+Outputs:
+  DataLakeBucketName:
+    Description: The name of the S3 bucket created
+    Value: !Ref DataLakeBucket
