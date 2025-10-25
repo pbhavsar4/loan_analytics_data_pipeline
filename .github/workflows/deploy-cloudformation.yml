@@ -55,7 +55,7 @@ jobs:
 
           # Zip Bronze Lambda
           cd ${{ env.LOCAL_LAMBDA_CODE_PATH }}
-          zip -r ../lambda_transform_bronze_to_silver.zip pipelne/lambda_transform_bronze_to_silver/*
+          zip -r ../lambda_transform_bronze_to_silver.zip pipeline/lambda_transform_bronze_to_silver/*
           cd ..
           aws s3 cp lambda_transform_bronze_to_silver.zip s3://$BUCKET/code/
           echo "✅ Uploaded Bronze Lambda code to s3://$BUCKET/code/"
