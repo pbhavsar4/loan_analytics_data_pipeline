@@ -40,6 +40,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - glue:GetDatabase
+                  - glue:CreateDatabase          # added permission
                   - glue:GetTable
                   - glue:CreateTable
                   - glue:UpdateTable
@@ -49,6 +50,15 @@ Resources:
                   - glue:UpdatePartition
                   - glue:DeletePartition
                 Resource: "*"
+
+  # ---- Glue Database ----
+  LoanAnalyticsDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref "AWS::AccountId"
+      DatabaseInput:
+        Name: loan_analytics
+        Description: "Database for Loan Analytics ETL pipeline"
 
   # ---- Bronze Lambda ----
   BronzeLambdaFunction:
@@ -67,6 +77,7 @@ Resources:
           BUCKET_NAME: !Ref DataLakeBucketName
           BRONZE_PREFIX: data/bronze/
           SILVER_PREFIX: data/silver/
+          ATHENA_DATABASE: loan_analytics       # added env variable
       Layers:
         - arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python39:31
 
@@ -87,6 +98,7 @@ Resources:
           BUCKET_NAME: !Ref DataLakeBucketName
           SILVER_PREFIX: data/silver/
           GOLD_PREFIX: data/gold/
+          ATHENA_DATABASE: loan_analytics       # added env variable
       Layers:
         - arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python39:31
 
