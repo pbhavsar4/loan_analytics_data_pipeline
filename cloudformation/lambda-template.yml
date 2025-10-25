@@ -68,6 +68,7 @@ Resources:
       Handler: lambda-function.lambda_handler
       Runtime: python3.9
       Timeout: 120
+      MemorySize: 1000
       Role: !GetAtt LoanETLRole.Arn
       Code:
         S3Bucket: !Ref DataLakeBucketName
@@ -89,6 +90,7 @@ Resources:
       Handler: lambda-function.lambda_handler
       Runtime: python3.9
       Timeout: 120
+      MemorySize: 1000
       Role: !GetAtt LoanETLRole.Arn
       Code:
         S3Bucket: !Ref DataLakeBucketName
