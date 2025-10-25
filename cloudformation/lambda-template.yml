@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Lambda functions for ETL pipeline triggered by S3 uploads"
+Description: "ETL pipeline with Lambda triggers for Bronze → Silver → Gold"
 
 Parameters:
   DataLakeBucketName:
@@ -39,9 +39,9 @@ Resources:
   BronzeLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: "lambda-function"
-      Handler: index.handler
-      Runtime: python3.9                                                                                                 
+      FunctionName: "lambda_transform_bronze_to_silver"
+      Handler: lambda-function.handler
+      Runtime: python3.9
       Timeout: 120
       Role: !GetAtt LoanETLRole.Arn
       Code:
@@ -52,13 +52,15 @@ Resources:
           BUCKET_NAME: !Ref DataLakeBucketName
           INPUT_PREFIX: data/bronze/
           OUTPUT_PREFIX: data/silver/
+      Layers:
+        - arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python39:31
 
   # ---- Silver Lambda ----
   SilverLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: "lambda_transform_silver_to_gold"
-      Handler: index.handler
+      Handler: lambda-function.handler
       Runtime: python3.9
       Timeout: 120
       Role: !GetAtt LoanETLRole.Arn
@@ -70,6 +72,8 @@ Resources:
           BUCKET_NAME: !Ref DataLakeBucketName
           INPUT_PREFIX: data/silver/
           OUTPUT_PREFIX: data/gold/
+      Layers:
+        - arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python39:31
 
   # ---- Permissions for S3 to invoke Lambdas ----
   BronzeInvokePermission:
@@ -87,6 +91,31 @@ Resources:
       Action: "lambda:InvokeFunction"
       Principal: "s3.amazonaws.com"
       SourceArn: !Sub "arn:aws:s3:::${DataLakeBucketName}"
+
+  # ---- S3 Event Notifications ----
+  DataLakeBucketNotification:
+    Type: AWS::S3::BucketNotification
+    Properties:
+      Bucket: !Ref DataLakeBucketName
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: "s3:ObjectCreated:*"
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: data/bronze/
+            Function: !GetAtt BronzeLambdaFunction.Arn
+          - Event: "s3:ObjectCreated:*"
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: data/silver/
+            Function: !GetAtt SilverLambdaFunction.Arn
+    DependsOn:
+      - BronzeInvokePermission
+      - SilverInvokePermission
 
 Outputs:
   BronzeLambdaArn:
