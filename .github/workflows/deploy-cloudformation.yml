@@ -12,7 +12,6 @@ jobs:
 
     env:
       AWS_REGION: eu-west-2
-      S3_STACK_NAME: loan-etl-s3
       LAMBDA_STACK_NAME: loan-etl-lambda
       LOCAL_LAMBDA_CODE_PATH: datapipeline/lambda  # your lambda folder path
 
@@ -29,29 +28,30 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3️⃣ Get the S3 bucket name from CloudFormation outputs
-      - name: Get S3 bucket name
-        id: get_bucket
+      # 3️⃣ Create a unique S3 bucket (for this environment)
+      - name: Create S3 bucket
+        id: create_bucket
         run: |
-          BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name $S3_STACK_NAME \
-            --query "Stacks[0].Outputs[?OutputKey=='DataLakeBucketName'].OutputValue" \
-            --output text)
-          echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
-          echo "Using S3 Bucket: $BUCKET"
+          BUCKET_NAME="loan-analysis-datalake-${GITHUB_RUN_ID}-${RANDOM}"
+          echo "Creating bucket: $BUCKET_NAME"
+          aws s3api create-bucket \
+            --bucket $BUCKET_NAME \
+            --region $AWS_REGION \
+            --create-bucket-configuration LocationConstraint=$AWS_REGION
+          echo "bucket=$BUCKET_NAME" >> $GITHUB_OUTPUT
 
       # 4️⃣ Upload Lambda code to /code folder in the S3 bucket
       - name: Upload Lambda code to S3
         run: |
-          aws s3 cp $LOCAL_LAMBDA_CODE_PATH s3://${{ steps.get_bucket.outputs.bucket }}/code/ --recursive
-          echo "✅ Uploaded Lambda code to s3://${{ steps.get_bucket.outputs.bucket }}/code/"
+          aws s3 cp $LOCAL_LAMBDA_CODE_PATH s3://${{ steps.create_bucket.outputs.bucket }}/code/ --recursive
+          echo "✅ Uploaded Lambda code to s3://${{ steps.create_bucket.outputs.bucket }}/code/"
 
       # 5️⃣ Package the Lambda CloudFormation template
       - name: Package Lambda CloudFormation template
         run: |
           aws cloudformation package \
             --template-file cloudformation/lambda-template.yml \
-            --s3-bucket ${{ steps.get_bucket.outputs.bucket }} \
+            --s3-bucket ${{ steps.create_bucket.outputs.bucket }} \
             --output-template-file cloudformation/packaged-template.yml
 
       # 6️⃣ Deploy the Lambda stack
@@ -61,7 +61,7 @@ jobs:
             --template-file cloudformation/packaged-template.yml \
             --stack-name $LAMBDA_STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
-            --parameter-overrides DataLakeBucketName=${{ steps.get_bucket.outputs.bucket }}
+            --parameter-overrides DataLakeBucketName=${{ steps.create_bucket.outputs.bucket }}
 
       # 7️⃣ Verification step (optional)
       - name: List Lambda functions
