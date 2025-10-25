@@ -2,12 +2,39 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Lambda functions for ETL pipeline triggered by S3 uploads"
 
 Parameters:
-  # Bucket name is passed as a parameter (no Default)
   DataLakeBucketName:
     Type: String
     Description: "Name of the existing S3 data lake bucket"
 
 Resources:
+  # ---- IAM Role for Lambda ----
+  LoanETLRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LoanETLRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${DataLakeBucketName}
+                  - !Sub arn:aws:s3:::${DataLakeBucketName}/*
+
   # ---- Bronze Lambda ----
   BronzeLambdaFunction:
     Type: AWS::Lambda::Function
@@ -16,10 +43,15 @@ Resources:
       Handler: index.handler
       Runtime: python3.9
       Timeout: 60
-      Role: arn:aws:iam::<ACCOUNT_ID>:role/<YOUR_LAMBDA_ROLE>
+      Role: !GetAtt LoanETLRole.Arn
       Code:
         S3Bucket: !Ref DataLakeBucketName
-        S3Key: lambda/bronze.zip
+        S3Key: pipeline/bronze.zip
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref DataLakeBucketName
+          INPUT_PREFIX: data/bronze/
+          OUTPUT_PREFIX: data/silver/
 
   # ---- Silver Lambda ----
   SilverLambdaFunction:
@@ -29,10 +61,15 @@ Resources:
       Handler: index.handler
       Runtime: python3.9
       Timeout: 60
-      Role: arn:aws:iam::<ACCOUNT_ID>:role/<YOUR_LAMBDA_ROLE>
+      Role: !GetAtt LoanETLRole.Arn
       Code:
         S3Bucket: !Ref DataLakeBucketName
-        S3Key: lambda/silver.zip
+        S3Key: pipeline/silver.zip
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref DataLakeBucketName
+          INPUT_PREFIX: data/silver/
+          OUTPUT_PREFIX: data/gold/
 
   # ---- Permissions for S3 to invoke Lambdas ----
   BronzeInvokePermission:
@@ -59,3 +96,7 @@ Outputs:
   SilverLambdaArn:
     Description: "ARN of Silver Lambda Function"
     Value: !GetAtt SilverLambdaFunction.Arn
+
+  LambdaRoleArn:
+    Description: "ARN of the IAM role used by Lambda functions"
+    Value: !GetAtt LoanETLRole.Arn
