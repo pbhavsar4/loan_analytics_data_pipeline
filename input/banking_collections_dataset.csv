@@ -1,5 +1,5 @@
 Customer_ID,Name,Account_Number,Account_Type,Loan_Type,Loan_Amount,Outstanding_Amount,EMI_Amount,Due_Date,Payment_Status,Collection_Agent,Last_Payment_Date,Payment_Delay_Days,Region,Contact_Number,Email,Customer_Score,Risk_Level
-CUST00000,Richard Mccarty,81087F51-C9F,Current,Car Loan,299783,119495.19,2597.72,2023-12-05,Paid,Tyler Copeland,2023-10-06,0,West,001-713-059-9538x4286,diane22@gmail.com,557,Medium
+CUST00000,Richards Mccarty,81087F51-C9F,Current,Car Loan,299783,119495.19,2597.72,2023-12-05,Paid,Tyler Copeland,2023-10-06,0,West,001-713-059-9538x4286,diane22@gmail.com,557,Medium
 CUST00001,Patrick Kane,819326DB-44D,Current,Home Loan,46987,37830.59,1576.27,2023-04-07,Paid,Lindsey Doyle,2023-03-20,0,South,001-118-785-4275,edward97@yahoo.com,500,High
 CUST00002,Jean Morgan,A8682A8D-986,Current,Home Loan,259917,112988.74,4035.31,2024-10-31,Missed,Shawna Smith,,43,East,+1-158-183-9055,ifranklin@gmail.com,342,High
 CUST00003,Michael Green,45516DAD-9C8,Credit,Personal Loan,198807,122047.34,3698.4,2024-01-23,Partially Paid,Peter Miller,2023-11-10,84,South,828-258-5077,craig92@franklin-lindsey.com,806,Low
