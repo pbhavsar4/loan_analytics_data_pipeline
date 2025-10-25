@@ -40,7 +40,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - glue:GetDatabase
-                  - glue:CreateDatabase          # added permission
+                  - glue:CreateDatabase         
                   - glue:GetTable
                   - glue:CreateTable
                   - glue:UpdateTable
@@ -98,7 +98,7 @@ Resources:
           BUCKET_NAME: !Ref DataLakeBucketName
           SILVER_PREFIX: data/silver/
           GOLD_PREFIX: data/gold/
-          ATHENA_DATABASE: loan_analytics       # added env variable
+          ATHENA_DATABASE: loan_analytics 
       Layers:
         - arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python39:31
 
