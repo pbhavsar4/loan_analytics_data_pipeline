@@ -1,48 +1,44 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Lambda functions for ETL pipeline"
+Description: "Lambda functions for ETL pipeline triggered by S3 uploads"
 
 Parameters:
-  BronzePrefix:
+  DataLakeBucketName:
     Type: String
-    Default: "bronze/"
-  SilverPrefix:
-    Type: String
-    Default: "silver/"
+    Description: "Name of the existing S3 data lake bucket"
+    Default: !ImportValue DataLakeBucketName
 
 Resources:
-  # Import S3 bucket name from S3 stack
-  DataLakeBucketName:
-    Value: !ImportValue DataLakeBucketName
-
-  LambdaBronze:
+  # ---- Bronze Lambda ----
+  BronzeLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: "bronze-transform-lambda"
       Handler: index.handler
-      Role: arn:aws:iam::<ACCOUNT_ID>:role/<YOUR_LAMBDA_ROLE>
       Runtime: python3.9
-      Code:
-        S3Bucket: !ImportValue DataLakeBucketName
-        S3Key: lambda/bronze.zip
       Timeout: 60
+      Role: arn:aws:iam::<ACCOUNT_ID>:role/<YOUR_LAMBDA_ROLE>
+      Code:
+        S3Bucket: !Ref DataLakeBucketName
+        S3Key: lambda/bronze.zip
 
-  LambdaSilver:
+  # ---- Silver Lambda ----
+  SilverLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: "silver-transform-lambda"
       Handler: index.handler
-      Role: arn:aws:iam::<ACCOUNT_ID>:role/<YOUR_LAMBDA_ROLE>
       Runtime: python3.9
-      Code:
-        S3Bucket: !ImportValue DataLakeBucketName
-        S3Key: lambda/silver.zip
       Timeout: 60
+      Role: arn:aws:iam::<ACCOUNT_ID>:role/<YOUR_LAMBDA_ROLE>
+      Code:
+        S3Bucket: !Ref DataLakeBucketName
+        S3Key: lambda/silver.zip
 
-  # Grant permissions for S3 to invoke these Lambdas
+  # ---- Permissions for S3 to invoke Lambdas ----
   BronzeInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref LambdaBronze
+      FunctionName: !Ref BronzeLambdaFunction
       Action: "lambda:InvokeFunction"
       Principal: "s3.amazonaws.com"
       SourceArn: !Sub "arn:aws:s3:::${DataLakeBucketName}"
@@ -50,13 +46,38 @@ Resources:
   SilverInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref LambdaSilver
+      FunctionName: !Ref SilverLambdaFunction
       Action: "lambda:InvokeFunction"
       Principal: "s3.amazonaws.com"
       SourceArn: !Sub "arn:aws:s3:::${DataLakeBucketName}"
 
+  # ---- S3 Bucket Notification Configuration ----
+  S3BucketNotification:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref DataLakeBucketName
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: "s3:ObjectCreated:*"
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: "prefix"
+                    Value: "bronze/"
+            Function: !GetAtt BronzeLambdaFunction.Arn
+          - Event: "s3:ObjectCreated:*"
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: "prefix"
+                    Value: "silver/"
+            Function: !GetAtt SilverLambdaFunction.Arn
+
 Outputs:
-  LambdaBronzeArn:
-    Value: !GetAtt LambdaBronze.Arn
-  LambdaSilverArn:
-    Value: !GetAtt LambdaSilver.Arn
+  BronzeLambdaArn:
+    Description: "ARN of Bronze Lambda Function"
+    Value: !GetAtt BronzeLambdaFunction.Arn
+
+  SilverLambdaArn:
+    Description: "ARN of Silver Lambda Function"
+    Value: !GetAtt SilverLambdaFunction.Arn
