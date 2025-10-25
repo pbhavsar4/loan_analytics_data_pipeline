@@ -31,6 +31,7 @@ Resources:
                   - s3:GetObject
                   - s3:PutObject
                   - s3:ListBucket
+                  - s3:PutBucketNotificationConfiguration
                 Resource:
                   - !Sub arn:aws:s3:::${DataLakeBucketName}
                   - !Sub arn:aws:s3:::${DataLakeBucketName}/*
@@ -108,10 +109,16 @@ Resources:
 
           def handler(event, context):
               try:
+                  if event['RequestType'] == 'Delete':
+                      # On stack delete, do nothing
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      return
+
                   s3 = boto3.client('s3')
                   bucket = event['ResourceProperties']['BucketName']
                   bronze_lambda = event['ResourceProperties']['BronzeLambdaArn']
                   silver_lambda = event['ResourceProperties']['SilverLambdaArn']
+
                   s3.put_bucket_notification_configuration(
                       Bucket=bucket,
                       NotificationConfiguration={
@@ -137,11 +144,15 @@ Resources:
   # ---- Custom Resource to trigger S3 trigger Lambda ----
   S3TriggerSetterResource:
     Type: Custom::S3TriggerSetter
+    DependsOn:
+      - BronzeInvokePermission
+      - SilverInvokePermission
     Properties:
       ServiceToken: !GetAtt S3TriggerSetterFunction.Arn
       BucketName: !Ref DataLakeBucketName
       BronzeLambdaArn: !GetAtt BronzeLambdaFunction.Arn
       SilverLambdaArn: !GetAtt SilverLambdaFunction.Arn
+    DeletionPolicy: Retain
 
 Outputs:
   BronzeLambdaArn:
