@@ -1,0 +1,110 @@
+name: Deploy ETL Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloudformation/**"
+      - "pipeline/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: eu-west-2
+      RDS_STACK_NAME: loan-rds-stack
+      LAMBDA_STACK_NAME: loan-etl-lambda
+      LOCAL_LAMBDA_CODE_PATH: pipeline/
+      DATA_LAKE_BUCKET: loan-analysis-datalake-main
+
+    steps:
+      # Step 1️⃣: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2️⃣: Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Step 3️⃣: Ensure data lake bucket exists
+      - name: Ensure data lake bucket exists
+        id: ensure_bucket
+        run: |
+          BUCKET=${{ env.DATA_LAKE_BUCKET }}
+          echo "Checking if S3 bucket $BUCKET exists..."
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "✅ Bucket $BUCKET already exists."
+          else
+            echo "Creating bucket $BUCKET..."
+            aws s3api create-bucket \
+              --bucket "$BUCKET" \
+              --region "$AWS_REGION" \
+              --create-bucket-configuration LocationConstraint=$AWS_REGION
+          fi
+          echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
+
+        # ✅ Step 4️⃣: Build Lambda dependencies (psycopg, pandas, pyarrow)
+      - name: Build Lambda dependencies
+        run: |
+          mkdir build
+          pip install \
+            --platform manylinux2014_x86_64 \
+            --only-binary=:all: \
+            --python-version 3.9 \
+            --target build \
+            psycopg[binary] pandas pyarrow
+          cp -r ${{ env.LOCAL_LAMBDA_CODE_PATH }}/* build/
+      
+      # Step 5️⃣: Package and upload Lambda functions to S3
+      - name: Package and upload Lambda functions to S3
+        run: |
+          BUCKET=${{ steps.ensure_bucket.outputs.bucket }}
+          # Package Bronze Lambda
+          cd build/lambda_transform_bronze_to_silver/
+          zip -r ../../lambda_transform_bronze_to_silver.zip . >/dev/null
+          aws s3 cp ../../lambda_transform_bronze_to_silver.zip s3://$BUCKET/code/
+          echo "✅ Bronze Lambda uploaded."
+          # Package Silver Lambda
+          cd ../lambda_transform_silver_to_gold/
+          zip -r ../../lambda_transform_silver_to_gold.zip . >/dev/null
+          aws s3 cp ../../lambda_transform_silver_to_gold.zip s3://$BUCKET/code/
+          echo "✅ Silver Lambda uploaded."
+
+      # # Step 6️⃣: Deploy RDS CloudFormation stack
+      # - name: Deploy RDS infrastructure stack
+      #   uses: aws-actions/aws-cloudformation-github-deploy@v1
+      #   with:
+      #     name: ${{ env.RDS_STACK_NAME }}
+      #     template: cloudformation/rds-postgre-template.yml
+      #     capabilities: CAPABILITY_IAM
+      #     no-fail-on-empty-changeset: "1"
+      #   continue-on-error: false
+      # Step 7️⃣: Package Lambda CloudFormation template
+      - name: Package Lambda CloudFormation template
+        run: |
+          aws cloudformation package \
+            --template-file cloudformation/lambda-template.yml \
+            --s3-bucket ${{ steps.ensure_bucket.outputs.bucket }} \
+            --output-template-file cloudformation/packaged-template.yml
+      # Step 8️⃣: Deploy Lambda CloudFormation stack
+      - name: Deploy ETL Lambda CloudFormation stack
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: ${{ env.LAMBDA_STACK_NAME }}
+          template: cloudformation/packaged-template.yml
+          capabilities: CAPABILITY_NAMED_IAM
+          parameter-overrides: |
+            DataLakeBucketName=${{ steps.ensure_bucket.outputs.bucket }}
+          no-fail-on-empty-changeset: "1"
+
+      # Step 9️⃣: Post-deployment verification
+      - name: Verify all deployed Lambdas
+        run: |
+          echo "Listing deployed Lambda functions..."
+          aws lambda list-functions --region $AWS_REGION --query "Functions[?contains(FunctionName,'loan')].FunctionName"

@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Step Function triggered ETL from Bronze → Silver → Gold
+
+Parameters:
+  DataLakeBucketName:
+    Type: String
+    Description: "Name of the existing S3 data lake bucket"
+    
+Resources:
+
+  ######################################################
+  # Step Functions Execution Role
+  ######################################################
+  StepFunctionsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambdasFromStepFunction
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                # ✅ Use Fn::Sub to substitute imported ARNs
+                Resource:
+                  - !ImportValue BronzeLambdaArn
+                  - !ImportValue SilverLambdaArn
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                Resource: "*"
+
+  ######################################################
+  # Step Function Definition
+  ######################################################
+  StateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: LoanETLStateMachine
+      RoleArn: !GetAtt StepFunctionsExecutionRole.Arn
+      DefinitionString:
+        Fn::Sub:
+          - |
+            {
+              "Comment": "ETL flow: Bronze to Silver to Gold",
+              "StartAt": "BronzeLambda",
+              "States": {
+                "BronzeLambda": {
+                  "Type": "Task",
+                  "Resource": "${BronzeLambda}",
+                  "Next": "SilverLambda"
+                },
+                "SilverLambda": {
+                  "Type": "Task",
+                  "Resource": "${SilverLambda}",
+                  "End": true
+                }
+              }
+            }
+          - {
+              BronzeLambda: !ImportValue BronzeLambdaArn,
+              SilverLambda: !ImportValue SilverLambdaArn
+            }
+
+  ######################################################
+  # EventBridge Rule (Optional)
+  #####################################################
+          
+  BronzeFolderUploadRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Trigger Step Function when bronze folder is updated
+      EventPattern:
+        source:
+          - "aws.s3"
+        detail-type:
+          - "Object Created"
+        detail:
+          bucket:
+            name:
+              - !Ref DataLakeBucketName
+          object:
+            key:
+              - prefix: "data/bronze/"      # only trigger for bronze folder
+      Targets:
+        - Arn: !GetAtt StateMachine.Arn
+          Id: StepFunctionTarget
+          RoleArn: !GetAtt EventBridgeInvokeStepFunctionRole.Arn
+
+  ######################################################
+  # EventBridge Role
+  ######################################################
+  EventBridgeInvokeStepFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StartStepFunctionExecution
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                Resource: !GetAtt StateMachine.Arn
+
+Outputs:
+  StateMachineArn:
+    Description: ARN of the Step Function
+    Value: !Ref StateMachine
+    Export:
+      Name: StepFunctionArn

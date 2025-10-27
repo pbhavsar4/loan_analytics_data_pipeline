@@ -1,0 +1,15 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "S3 bucket for ETL pipeline with event triggers"
+
+Resources:
+  DataLakeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "loan-analysis-datalake-${AWS::Region}"
+
+Outputs:
+  DataLakeBucketName:
+    Description: "Data Lake Bucket Name"
+    Value: !Ref DataLakeBucket
+    Export:
+      Name: DataLakeBucketName

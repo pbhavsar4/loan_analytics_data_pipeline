@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "ETL Lambdas within RDS VPC, connecting securely to RDS Secrets Manager credentials"
+
+Parameters:
+  DataLakeBucketName:
+    Type: String
+    Description: "Name of the existing S3 data lake bucket"
+
+Resources:
+  # ---- IAM Role for ETL Lambdas ----
+  LoanETLRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LoanETLRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: DataLakeGlueRDSAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # S3 Access
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataLakeBucketName}
+                  - !Sub arn:aws:s3:::${DataLakeBucketName}/*
+
+              # Glue Access
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:CreateDatabase
+                  - glue:GetTable
+                  - glue:CreateTable
+                  - glue:UpdateTable
+                Resource: "*"
+
+              # Secrets Manager Access
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: "*"
+
+  # ---- Bronze Lambda ----
+  BronzeLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "lambda_transform_bronze_to_silver"
+      Handler: lambda-function.lambda_handler
+      Runtime: python3.9
+      Timeout: 120
+      MemorySize: 1024
+      Role: !GetAtt LoanETLRole.Arn
+      Code:
+        S3Bucket: !Ref DataLakeBucketName
+        S3Key: code/lambda_transform_bronze_to_silver.zip
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref DataLakeBucketName
+          BRONZE_PREFIX: data/bronze/
+          SILVER_PREFIX: data/silver/
+          ATHENA_DATABASE: loan_analytics
+      Layers:
+        - arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python39:31
+
+  # ---- Silver Lambda (Connects to RDS inside VPC) ----
+  SilverLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "lambda_transform_silver_to_gold"
+      Handler: lambda-function.lambda_handler
+      Runtime: python3.9
+      Timeout: 600
+      MemorySize: 2048
+      Role: !GetAtt LoanETLRole.Arn
+      Code:
+        S3Bucket: !Ref DataLakeBucketName
+        S3Key: code/lambda_transform_silver_to_gold.zip
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref DataLakeBucketName
+          SILVER_PREFIX: data/silver/
+          GOLD_PREFIX: data/gold/
+          ATHENA_DATABASE: loan_analytics
+          DB_SECRET_NAME: !ImportValue RDSSecretName
+          DB_HOST: !ImportValue RDSInstanceEndpoint
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue RDSSecurityGroup
+        SubnetIds:
+          - !ImportValue PrivateSubnet1Id
+          - !ImportValue PrivateSubnet2Id
+      Layers:
+        - arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python39:31
+
+Outputs:
+  BronzeLambdaArn:
+    Description: "ARN of Bronze Lambda Function"
+    Value: !GetAtt BronzeLambdaFunction.Arn
+    Export:
+      Name: BronzeLambdaArn
+
+  SilverLambdaArn:
+    Description: "ARN of Silver Lambda Function"
+    Value: !GetAtt SilverLambdaFunction.Arn
+    Export:
+      Name: SilverLambdaArn 
+
+  LambdaRoleArn:
+    Description: "ARN of IAM role used by Lambda functions"
+    Value: !GetAtt LoanETLRole.Arn
+    Export:
+      Name: LambdaRoleArn
+
