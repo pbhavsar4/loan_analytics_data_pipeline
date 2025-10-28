@@ -50,7 +50,7 @@ jobs:
           fi
           echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
 
-        # ✅ Step 4️⃣: Build Lambda dependencies (psycopg, pandas, pyarrow)
+        # ✅ Step 4️⃣: Build Lambda dependencies 
       - name: Build Lambda dependencies
         run: |
           mkdir build
@@ -71,15 +71,15 @@ jobs:
           aws s3 cp ../../lambda_transform_silver_to_gold.zip s3://$BUCKET/code/
           echo "✅ Silver Lambda uploaded."
 
-      # # Step 6️⃣: Deploy RDS CloudFormation stack
-      # - name: Deploy RDS infrastructure stack
-      #   uses: aws-actions/aws-cloudformation-github-deploy@v1
-      #   with:
-      #     name: ${{ env.RDS_STACK_NAME }}
-      #     template: cloudformation/rds-postgre-template.yml
-      #     capabilities: CAPABILITY_IAM
-      #     no-fail-on-empty-changeset: "1"
-      #   continue-on-error: false
+      # Step 6️⃣: Deploy RDS CloudFormation stack
+      - name: Deploy RDS infrastructure stack
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: ${{ env.RDS_STACK_NAME }}
+          template: cloudformation/rds-postgre-template.yml
+          capabilities: CAPABILITY_IAM
+          no-fail-on-empty-changeset: "1"
+        continue-on-error: false
         
       # Step 7️⃣: Package Lambda CloudFormation template
       - name: Package Lambda CloudFormation template
