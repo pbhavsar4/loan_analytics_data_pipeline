@@ -18,6 +18,7 @@ jobs:
       LAMBDA_STACK_NAME: loan-etl-lambda
       LOCAL_LAMBDA_CODE_PATH: pipeline/
       DATA_LAKE_BUCKET: loan-analysis-datalake-main
+      STEP_FUNCTION_STACK_NAME: loan-etl-step-function
 
     steps:
       # Step 1️⃣: Checkout code
@@ -53,12 +54,6 @@ jobs:
       - name: Build Lambda dependencies
         run: |
           mkdir build
-          pip install \
-            --platform manylinux2014_x86_64 \
-            --only-binary=:all: \
-            --python-version 3.9 \
-            --target build \
-            psycopg[binary] pandas pyarrow
           cp -r ${{ env.LOCAL_LAMBDA_CODE_PATH }}/* build/
       
       # Step 5️⃣: Package and upload Lambda functions to S3
@@ -76,15 +71,15 @@ jobs:
           aws s3 cp ../../lambda_transform_silver_to_gold.zip s3://$BUCKET/code/
           echo "✅ Silver Lambda uploaded."
 
-      # Step 6️⃣: Deploy RDS CloudFormation stack
-      - name: Deploy RDS infrastructure stack
-        uses: aws-actions/aws-cloudformation-github-deploy@v1
-        with:
-          name: ${{ env.RDS_STACK_NAME }}
-          template: cloudformation/rds-postgre-template.yml
-          capabilities: CAPABILITY_IAM
-          no-fail-on-empty-changeset: "1"
-        continue-on-error: false
+      # # Step 6️⃣: Deploy RDS CloudFormation stack
+      # - name: Deploy RDS infrastructure stack
+      #   uses: aws-actions/aws-cloudformation-github-deploy@v1
+      #   with:
+      #     name: ${{ env.RDS_STACK_NAME }}
+      #     template: cloudformation/rds-postgre-template.yml
+      #     capabilities: CAPABILITY_IAM
+      #     no-fail-on-empty-changeset: "1"
+      #   continue-on-error: false
         
       # Step 7️⃣: Package Lambda CloudFormation template
       - name: Package Lambda CloudFormation template
@@ -103,9 +98,13 @@ jobs:
           parameter-overrides: |
             DataLakeBucketName=${{ steps.ensure_bucket.outputs.bucket }}
           no-fail-on-empty-changeset: "1"
-
-      # Step 9️⃣: Post-deployment verification
-      - name: Verify all deployed Lambdas
-        run: |
-          echo "Listing deployed Lambda functions..."
-          aws lambda list-functions --region $AWS_REGION --query "Functions[?contains(FunctionName,'loan')].FunctionName"
+      # Step 9️⃣: Deploy Step Function (ETL Orchestration Pipeline)
+      - name: Deploy Step Function ETL Pipeline
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: ${{ env.STEP_FUNCTION_STACK_NAME }}
+          template: cloudformation/step-function-template.yml
+          capabilities: CAPABILITY_NAMED_IAM
+          parameter-overrides: |
+            DataLakeBucketName=${{ steps.ensure_bucket.outputs.bucket }}
+          no-fail-on-empty-changeset: "1"
