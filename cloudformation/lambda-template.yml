@@ -6,6 +6,10 @@ Parameters:
     Type: String
     Description: "Name of the existing S3 data lake bucket"
 
+  CodeVersion:
+    Type: String
+    Default: "v1"
+
 Resources:
   # ---- IAM Role for ETL Lambdas ----
   LoanETLRole:
