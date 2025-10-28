@@ -111,4 +111,6 @@ jobs:
           name: ${{ env.STEP_FUNCTION_STACK_NAME }}
           template: cloudformation/step-function-template.yml
           capabilities: CAPABILITY_NAMED_IAM
+          parameter-overrides: |
+            InputBucket=${{ steps.ensure_bucket.outputs.bucket }}
           no-fail-on-empty-changeset: "1"
