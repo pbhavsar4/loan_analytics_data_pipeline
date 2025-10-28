@@ -106,5 +106,5 @@ jobs:
           template: cloudformation/step-function-template.yml
           capabilities: CAPABILITY_NAMED_IAM
           parameter-overrides: |
-            InputBucket=${{ steps.ensure_bucket.outputs.bucket }}
+            DataLakeBucketName=${{ steps.ensure_bucket.outputs.bucket }}
           no-fail-on-empty-changeset: "1"
