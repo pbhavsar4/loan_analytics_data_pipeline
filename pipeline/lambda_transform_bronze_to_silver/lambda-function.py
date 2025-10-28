@@ -1,3 +1,4 @@
+import datetime
 import os
 import boto3
 import awswrangler as wr
@@ -30,6 +31,8 @@ def lambda_handler(event, context):
     dim_customer = df[[
         "Customer_ID","Name","Region","Contact_Number","Email","Customer_Score","Risk_Level"
     ]].drop_duplicates(subset=["Customer_ID"])
+    
+    dim_customer["created_at"] = datetime.now()
 
     wr.s3.to_parquet(
         df=dim_customer,
@@ -42,6 +45,8 @@ def lambda_handler(event, context):
     dim_account = df[[
         "Account_Number","Account_Type","Loan_Type"
     ]].drop_duplicates(subset=["Account_Number"])
+
+    dim_account["created_at"] = datetime.now()
 
     wr.s3.to_parquet(
         df=dim_account,
@@ -56,6 +61,8 @@ def lambda_handler(event, context):
         "Due_Date","Payment_Status","Last_Payment_Date","Payment_Delay_Days",
         "Payment_On_Time_Flag","Payment_Behavior"
     ]]
+
+    fact_loan_payment["created_at"] = datetime.now()
 
     wr.s3.to_parquet(
         df=fact_loan_payment,

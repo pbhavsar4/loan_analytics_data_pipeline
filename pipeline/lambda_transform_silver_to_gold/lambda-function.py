@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import boto3
 import pandas as pd
@@ -120,6 +121,8 @@ def lambda_handler(event, context):
         "payment_delay_days": "avg_payment_delay",
         "customer_id": "customer_count"
     }, inplace=True)
+
+    agg_df["created_at"] = datetime.now()
 
     # Write aggregated data to Gold layer
     write_parquet_to_s3(agg_df, BUCKET_NAME, f"{GOLD_PREFIX}region_summary/data.parquet")

@@ -49,6 +49,11 @@ Resources:
       AvailabilityZone: !Select [1, !GetAZs '']
       MapPublicIpOnLaunch: false
 
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
   PrivateSubnet1Assoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -72,14 +77,22 @@ Resources:
           FromPort: 5432
           ToPort: 5432
           CidrIp: 94.2.245.70/32
-      SecurityGroupEgress: 
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          Destination: !Ref SecretsManagerEndpointSecurityGroup 
-        - IpProtocol: "-1" 
-          CidrIp: !Ref VpcCIDR
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: !Ref VpcCIDR
 
+  SecretsManagerEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow access to Secrets Manager endpoint
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VpcCIDR
+
+  # --- VPC Endpoints ---
   S3VPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -88,17 +101,6 @@ Resources:
       RouteTableIds:
         - !Ref PrivateRouteTable
       VpcEndpointType: Gateway
-
-  SecretsManagerEndpointSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Allow Lambda to access Secrets Manager endpoint
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          SourceSecurityGroupId: !ImportValue RDSSecurityGroup   # Lambda runs with this SG
 
   SecretsManagerVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
@@ -134,27 +136,6 @@ Resources:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
 
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-
-  AttachGateway:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
-  
-  PrivateRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-
-  PrivateDefaultRoute:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
-
   # --- RDS Instance ---
   RDSInstance:
     Type: AWS::RDS::DBInstance
@@ -168,11 +149,10 @@ Resources:
       DBSubnetGroupName: !Ref DBSubnetGroup
       VPCSecurityGroups:
         - !Ref RDSSecurityGroup
-      PubliclyAccessible: true
+      PubliclyAccessible: false
       DeletionProtection: false
 
 Outputs:
-
   VPCId:
     Description: VPC ID
     Value: !Ref VPC
@@ -208,5 +188,3 @@ Outputs:
     Value: !Ref RDSSecurityGroup
     Export:
       Name: RDSSecurityGroup
-
-
