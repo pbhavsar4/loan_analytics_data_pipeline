@@ -54,12 +54,6 @@ jobs:
       - name: Build Lambda dependencies
         run: |
           mkdir build
-          pip install \
-            --platform manylinux2014_x86_64 \
-            --only-binary=:all: \
-            --python-version 3.9 \
-            --target build \
-            psycopg[binary] pandas pyarrow
           cp -r ${{ env.LOCAL_LAMBDA_CODE_PATH }}/* build/
       
       # Step 5️⃣: Package and upload Lambda functions to S3
