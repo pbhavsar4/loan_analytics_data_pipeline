@@ -18,6 +18,7 @@ jobs:
       LAMBDA_STACK_NAME: loan-etl-lambda
       LOCAL_LAMBDA_CODE_PATH: pipeline/
       DATA_LAKE_BUCKET: loan-analysis-datalake-main
+      STEP_FUNCTION_STACK_NAME: loan-etl-step-function
 
     steps:
       # Step 1️⃣: Checkout code
@@ -103,9 +104,11 @@ jobs:
           parameter-overrides: |
             DataLakeBucketName=${{ steps.ensure_bucket.outputs.bucket }}
           no-fail-on-empty-changeset: "1"
-
-      # Step 9️⃣: Post-deployment verification
-      - name: Verify all deployed Lambdas
-        run: |
-          echo "Listing deployed Lambda functions..."
-          aws lambda list-functions --region $AWS_REGION --query "Functions[?contains(FunctionName,'loan')].FunctionName"
+      # Step 9️⃣: Deploy Step Function (ETL Orchestration Pipeline)
+      - name: Deploy Step Function ETL Pipeline
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: ${{ env.STEP_FUNCTION_STACK_NAME }}
+          template: cloudformation/step-function-template.yml
+          capabilities: CAPABILITY_NAMED_IAM
+          no-fail-on-empty-changeset: "1"
